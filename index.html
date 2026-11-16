@@ -60,6 +60,7 @@ input, textarea, select{width:100%;padding:12px;border:1px solid #ccc;border-rad
 <!-- Firebase SDK（相容版） -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 <!-- ===== 視圖0：首頁 ===== -->
@@ -159,8 +160,9 @@ input, textarea, select{width:100%;padding:12px;border:1px solid #ccc;border-rad
 <div class="page" id="admin-login">
   <div class="admin-login card">
     <h2>管理後台登入</h2>
-    <input type="password" id="admin-pwd" placeholder="輸入管理密碼">
-    <button class="btn" onclick="adminLogin()">登入</button>
+    <p style="color:#666;font-size:15px;margin-bottom:10px;">請使用已授權的 Google 帳號登入</p>
+    <button class="btn" onclick="adminGoogleLogin()">使用 Google 帳號登入</button>
+    <p id="admin-auth-msg" style="color:#b3261e;font-size:14px;margin-top:10px;"></p>
   </div>
 </div>
 
@@ -175,7 +177,7 @@ input, textarea, select{width:100%;padding:12px;border:1px solid #ccc;border-rad
   </div>
   <button class="btn" onclick="exportCSV()">匯出目前篩選結果CSV</button>
   <div id="admin-list"></div>
-  <button class="btn btn-back" onclick="location.hash=''">離開後台</button>
+  <button class="btn btn-back" onclick="adminSignOut()">登出並離開後台</button>
 </div>
 
 <script>
@@ -196,7 +198,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 // ==================================
 
-const ADMIN_PWD = "survey2024admin";
+// 授權可進後台的 Google 帳號，請改成你的 Gmail 位址（可放多組）
+const ADMIN_EMAILS = ["ckleong901@gmail.com"];
+let adminUser = null;
 
 // 題庫
 const scaleQuestions = [
@@ -492,20 +496,49 @@ function clearDraftAndRestart(){
   goPage(0);
 }
 
-// 後台登入
-async function adminLogin(){
-  const p = document.getElementById("admin-pwd").value.trim();
-  if(p === ADMIN_PWD){
-    const snap = await db.collection("survey").orderBy("ts","desc").get();
-    allSurveyData = [];
-    snap.forEach(doc=>{
-      allSurveyData.push({docId: doc.id, ...doc.data()});
-    })
-    initClassSelect();
-    renderAdmin();
-    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-    document.getElementById("admin-page").classList.add("active");
-  }else alert("密碼錯誤");
+// ===== 後台 Google 帳號驗證 =====
+async function adminGoogleLogin(){
+  const msg = document.getElementById("admin-auth-msg");
+  msg.textContent = "";
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await firebase.auth().signInWithPopup(provider);
+    await handleAdminUser(result.user);
+  }catch(err){
+    console.error(err);
+    msg.textContent = "登入失敗，請重試或改用其他瀏覽器";
+  }
+}
+
+async function handleAdminUser(user){
+  const msg = document.getElementById("admin-auth-msg");
+  if(!user){ adminUser = null; return; }
+  if(!ADMIN_EMAILS.includes(user.email)){
+    msg.textContent = "此帳號未獲授權，請使用指定的 Google 帳號";
+    await firebase.auth().signOut();
+    adminUser = null;
+    return;
+  }
+  adminUser = user;
+  await enterAdmin();
+}
+
+async function enterAdmin(){
+  const snap = await db.collection("survey").orderBy("ts","desc").get();
+  allSurveyData = [];
+  snap.forEach(doc=>{
+    allSurveyData.push({docId: doc.id, ...doc.data()});
+  })
+  initClassSelect();
+  renderAdmin();
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById("admin-page").classList.add("active");
+}
+
+async function adminSignOut(){
+  await firebase.auth().signOut();
+  adminUser = null;
+  location.hash = "";
 }
 
 function renderAdmin(){
@@ -574,12 +607,37 @@ async function deleteRecord(docId){
   }
 }
 
-// 路由
-window.onhashchange = ()=>{
+// ===== 路由與驗證狀態 =====
+function showAdminOrLogin(){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  if(location.hash === "#admin"){
-    document.getElementById("admin-login").classList.add("active");
+  const user = firebase.auth().currentUser;
+  if(user && ADMIN_EMAILS.includes(user.email)){
+    adminUser = user;
+    enterAdmin();
   }else{
+    adminUser = null;
+    document.getElementById("admin-login").classList.add("active");
+  }
+}
+
+firebase.auth().onAuthStateChanged((user)=>{
+  if(location.hash === "#admin"){
+    if(user && ADMIN_EMAILS.includes(user.email)){
+      adminUser = user;
+      enterAdmin();
+    }else{
+      adminUser = null;
+      document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+      document.getElementById("admin-login").classList.add("active");
+    }
+  }
+});
+
+window.onhashchange = ()=>{
+  if(location.hash === "#admin"){
+    showAdminOrLogin();
+  }else{
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
     document.getElementById("page0").classList.add("active");
   }
 }
