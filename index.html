@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>國中生問題處理與自我認知問卷</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui, "Microsoft JhengHei", sans-serif;margin:0;padding:0;}
+body{background:#f8f6f2;color:#333;padding:16px;max-width:700px;margin:0 auto;}
+.page{display:none;}
+.page.active{display:block;}
+.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px #00000012;}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;background:#e25c28;color:#fff;font-size:18px;margin-top:12px;cursor:pointer;min-height:48px;}
+.btn:disabled{background:#aaa;cursor:not-allowed;}
+.btn-back{background:#666;}
+.btn-delete{background:#b3261e;}
+input, textarea, select{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;margin:8px 0;font-size:16px;}
+.radio-row{display:flex;justify-content:space-between;margin:10px 0;gap:4px;}
+.radio-item{text-align:center;flex:1;}
+.progress{height:6px;background:#ddd;border-radius:3px;margin:10px 0;overflow:hidden;}
+.progress-bar{height:100%;background:#e25c28;transition:width 0.3s;}
+.title{font-size:30px;font-weight:bold;margin:20px 0 12px;}
+.desc{font-size:17px;line-height:1.6;color:#444;}
+.question{margin:20px 0;font-size:17px;line-height:1.5;}
+.admin-login{max-width:400px;margin:30px auto;}
+.loading{color:#e25c28;font-weight:bold;text-align:center;padding:10px;}
+.dim-item{margin:6px 0;padding:6px;background:#fef8f4;border-radius:6px;}
+.filter-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.filter-row select{flex:1;}
+
+/* ===== 單題作答頁 ===== */
+#q-counter{font-size:15px;color:#888;margin:6px 0;}
+#q-text{font-size:20px;line-height:1.5;margin:14px 0 22px;font-weight:bold;}
+.opt-list{display:flex;flex-direction:column;gap:10px;}
+.opt-btn{padding:14px 16px;border:2px solid #d9d2c8;border-radius:12px;background:#fff;font-size:17px;cursor:pointer;text-align:left;min-height:48px;}
+.opt-btn .opt-num{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#eee;font-weight:bold;margin-right:8px;}
+.opt-btn.selected{border-color:#e25c28;background:#fff5ee;}
+.opt-btn.selected .opt-num{background:#e25c28;color:#fff;}
+
+/* ===== 結果頁：亮眼總分 ===== */
+.total-hero{background:linear-gradient(135deg,#2a9d8f,#3fb8a8);border-radius:18px;padding:28px 20px;text-align:center;color:#fff;margin-bottom:18px;box-shadow:0 6px 18px #2a9d8f40;}
+.total-label{font-size:17px;letter-spacing:2px;opacity:.9;}
+.total-num{font-size:72px;font-weight:800;line-height:1.1;margin-top:6px;}
+.total-max{font-size:26px;opacity:.85;font-weight:600;}
+.result-section-title{font-size:18px;font-weight:bold;margin:20px 0 12px;}
+
+/* ===== 維度卡片 ===== */
+.dim-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px #00000012;}
+.dim-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.dim-name{font-size:16px;font-weight:bold;}
+.dim-score{font-size:22px;font-weight:800;white-space:nowrap;}
+.dim-score small{font-size:13px;color:#999;font-weight:600;}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:bold;margin-top:8px;}
+.badge.good{background:#e3f6f1;color:#1d7a6e;}
+.badge.mid{background:#fdf3dd;color:#a87b1c;}
+.badge.weak{background:#fde8e6;color:#b3261e;}
+.dim-tip{margin-top:10px;font-size:14.5px;line-height:1.55;color:#555;}
+.footnote{font-size:13.5px;color:#777;line-height:1.6;margin-top:14px;}
+</style>
+<!-- Firebase SDK（相容版） -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<!-- ===== 視圖0：首頁 ===== -->
+<div class="page active" id="page0">
+  <h1 class="title">問題處理與自我認知問卷</h1>
+  <div class="card">
+    <p class="desc">本問卷用於了解大家面對困難與問題時的想法、處理方式，幫助認識自己的處事模式與個人特質。<br><br>請務必填寫真實姓名，所有個人資料僅供學校輔導用途並嚴格保密。<br><br>答案沒有對錯好壞，請依真實想法與日常狀態作答。<br><br>本問卷會自動儲存填寫進度，若中途離開，於同一支手機重新進入可接續填寫。</p>
+  </div>
+  <button class="btn" onclick="startSurvey()">開始填寫</button>
+</div>
+
+<!-- ===== 視圖1：基本資料 ===== -->
+<div class="page" id="page1">
+  <div class="progress"><div class="progress-bar" style="width:10%"></div></div>
+  <h2>基本資料</h2>
+  <div class="question">
+    <label>姓名</label>
+    <input type="text" id="name" placeholder="請輸入姓名">
+  </div>
+  <div class="question">
+    <label>班級</label>
+    <select id="class">
+      <option value="">請選擇班級</option>
+    </select>
+  </div>
+  <div class="question">
+    <label>座號</label>
+    <input type="number" id="seat" placeholder="座號">
+  </div>
+  <div class="question">
+    <label>性別</label>
+    <div class="radio-row">
+      <label class="radio-item"><input type="radio" name="gender" value="男">男</label>
+      <label class="radio-item"><input type="radio" name="gender" value="女">女</label>
+      <label class="radio-item"><input type="radio" name="gender" value="不願透露">不願透露</label>
+    </div>
+  </div>
+  <button class="btn btn-back" onclick="goPage(0)">上一頁</button>
+  <button class="btn" onclick="nextPage()">下一頁</button>
+</div>
+
+<!-- ===== 視圖2：量表單題作答（每題一頁） ===== -->
+<div class="page" id="page2">
+  <div class="progress"><div class="progress-bar" id="q-progress"></div></div>
+  <p id="q-counter">第 1/30 題</p>
+  <p id="q-text"></p>
+  <div class="opt-list" id="q-options"></div>
+  <button class="btn btn-back" onclick="prevScale()">上一題</button>
+  <button class="btn" id="q-next" onclick="nextScale()">下一題</button>
+</div>
+
+<!-- ===== 視圖3：開放題1 ===== -->
+<div class="page" id="page3">
+  <div class="progress"><div class="progress-bar" style="width:50%"></div></div>
+  <h2>開放題 1/3</h2>
+  <div class="question">
+    <p>請寫出你最近遇到過的一件困擾你的事，以及你是怎麼處理的：</p>
+    <textarea id="open1" rows="6"></textarea>
+  </div>
+  <button class="btn btn-back" onclick="goPage(2)">上一頁</button>
+  <button class="btn" onclick="nextPage()">下一頁</button>
+</div>
+
+<!-- ===== 視圖4：開放題2 ===== -->
+<div class="page" id="page4">
+  <div class="progress"><div class="progress-bar" style="width:65%"></div></div>
+  <h2>開放題 2/3</h2>
+  <div class="question">
+    <p>你覺得自己處理問題時，最大的優點和最需要改進的地方各是什麼？</p>
+    <textarea id="open2" rows="6"></textarea>
+  </div>
+  <button class="btn btn-back" onclick="goPage(3)">上一頁</button>
+  <button class="btn" onclick="nextPage()">下一頁</button>
+</div>
+
+<!-- ===== 視圖5：開放題3 ===== -->
+<div class="page" id="page5">
+  <div class="progress"><div class="progress-bar" style="width:80%"></div></div>
+  <h2>開放題 3/3</h2>
+  <div class="question">
+    <p>當你遇到解決不了的困難時，你第一個會想到找誰幫忙？為什麼？</p>
+    <textarea id="open3" rows="6"></textarea>
+  </div>
+  <button class="btn btn-back" onclick="goPage(4)">上一頁</button>
+  <button class="btn" onclick="submitAll()">提交問卷</button>
+</div>
+
+<!-- ===== 視圖6：結果解讀 ===== -->
+<div class="page" id="page6">
+  <h2>你的問卷結果</h2>
+  <div id="result-box"></div>
+  <p class="loading">資料已上傳，謝謝填寫！</p>
+  <button class="btn" onclick="clearDraftAndRestart()">重新填寫</button>
+</div>
+
+<!-- ===== 管理後台登入 ===== -->
+<div class="page" id="admin-login">
+  <div class="admin-login card">
+    <h2>管理後台登入</h2>
+    <input type="password" id="admin-pwd" placeholder="輸入管理密碼">
+    <button class="btn" onclick="adminLogin()">登入</button>
+  </div>
+</div>
+
+<!-- ===== 管理後台列表 ===== -->
+<div class="page" id="admin-page">
+  <h2>所有回覆資料（含分數解讀）</h2>
+  <div class="filter-row">
+    <select id="filterClass">
+      <option value="">全部班級</option>
+    </select>
+    <button class="btn" style="width:auto;margin-top:0;" onclick="renderAdmin()">篩選</button>
+  </div>
+  <button class="btn" onclick="exportCSV()">匯出目前篩選結果CSV</button>
+  <div id="admin-list"></div>
+  <button class="btn btn-back" onclick="location.hash=''">離開後台</button>
+</div>
+
+<script>
+// ---------------- 班級清單，直接在這裡增減、修改班級 ----------------
+const CLASS_LIST = ["2026S3E"];
+// ----------------------------------------------------------------
+
+// ========== Firebase 設定 ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyANdhHYR3Unllk3BEXnLw2QBCyZGZstcSc",
+  authDomain: "student-survey-213c4.firebaseapp.com",
+  projectId: "student-survey-213c4",
+  storageBucket: "student-survey-213c4.firebasestorage.app",
+  messagingSenderId: "1010356723307",
+  appId: "1:1010356723307:web:502bb96809e6fcc52e5b2e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+// ==================================
+
+const ADMIN_PWD = "survey2024admin";
+
+// 題庫
+const scaleQuestions = [
+  {q:"1. 我覺得遇到困難和問題是很正常的事",r:false},
+  {q:"2. 遇到麻煩時，我會先告訴自己「總有辦法解決」",r:false},
+  {q:"3. 我認為解決問題的過程能讓自己變得更厲害",r:false},
+  {q:"4. 一碰到難題，我就覺得自己肯定辦不到",r:true},
+  {q:"5. 我覺得問題放著不管，最後都會自己解決",r:true},
+  {q:"6. 面對從沒遇過的新問題，我會願意嘗試看看",r:false},
+  {q:"7. 遇到問題時，我會先釐清原因再動手處理",r:false},
+  {q:"8. 一個方法行不通時，我會換其他方法繼續嘗試",r:false},
+  {q:"9. 處理麻煩事時，我會先想好步驟再一步步做",r:false},
+  {q:"10. 遇到難解決的事，我會直接放棄或躲開",r:true},
+  {q:"11. 不小心做錯事時，我會想辦法補救而不是逃避",r:false},
+  {q:"12. 我習慣等別人先出手解決問題",r:true},
+  {q:"13. 我清楚自己擅長處理哪一類型的問題",r:false},
+  {q:"14. 我知道自己處理問題時的弱點與不足在哪裡",r:false},
+  {q:"15. 我相信自己有能力應對日常遇到的大部分困難",r:false},
+  {q:"16. 我總覺得自己處理問題的能力比同學差",r:true},
+  {q:"17. 每次解決完問題，我都會更了解自己一點",r:false},
+  {q:"18. 我不知道自己面對困難時其實很堅強",r:true},
+  {q:"19. 遇到棘手的問題時，我能先讓自己冷靜下來",r:false},
+  {q:"20. 壓力大或心情不好時，我知道怎麼讓自己平靜",r:false},
+  {q:"21. 面對問題時，我不會因為情緒差就亂發脾氣",r:false},
+  {q:"22. 一遇到麻煩我就緊張到腦袋空白",r:true},
+  {q:"23. 問題解決不了時，我會難過很久走不出來",r:true},
+  {q:"24. 我有適合自己的方式來紓解處理問題的壓力",r:false},
+  {q:"25. 自己解決不了的問題，我會主動找長輩或同學幫忙",r:false},
+  {q:"26. 我覺得向別人求助並不是丟臉的事",r:false},
+  {q:"27. 遇到困難時，我很清楚可以找誰尋求協助",r:false},
+  {q:"28. 我不想讓別人知道我遇到解決不了的問題",r:true},
+  {q:"29. 別人給我的建議，我會認真參考並嘗試看看",r:false},
+  {q:"30. 我覺得凡事只能靠自己，別人幫不上什麼忙",r:true},
+];
+
+// 維度對應
+const dims = [
+  {name:"問題認知與心態",idx:[0,1,2,3,4,5]},
+  {name:"問題處理的行為方式",idx:[6,7,8,9,10,11]},
+  {name:"自我認知與處事信心",idx:[12,13,14,15,16,17]},
+  {name:"情緒調節與壓力因應",idx:[18,19,20,21,22,23]},
+  {name:"求助態度與資源運用",idx:[24,25,26,27,28,29]},
+];
+
+const OPT_LABELS = [
+  "非常不符合",
+  "不太符合",
+  "普通／說不準",
+  "比較符合",
+  "非常符合"
+];
+
+// 等第與簡短建議
+function getLevel(score){
+  if(score>=24) return {label:"優異",cls:"good"};
+  if(score>=16) return {label:"中等",cls:"mid"};
+  return {label:"薄弱",cls:"weak"};
+}
+function getTip(dimIndex, score){
+  if(score>=24){
+    const tips = [
+      "保持正向看待問題的態度，也可分享你的想法給同學。",
+      "你的處理步驟很穩，可嘗試用同樣方法挑戰更難的問題。",
+      "你很了解自己的能力，繼續在每次經驗中累積信心。",
+      "你能穩住情緒，這是處理問題時很重要的優勢。",
+      "你懂得善用身邊資源，遇到難題時繼續主動開口。"
+    ];
+    return tips[dimIndex];
+  }
+  if(score>=16){
+    const tips = [
+      "遇到難題先提醒自己「總有辦法」，別急著否定自己。",
+      "一個方法行不通時，試著換個方式再做一次。",
+      "多留意自己擅長與不足的地方，會更清楚怎麼準備。",
+      "壓力大時先深呼吸，讓自己冷靜後再繼續處理。",
+      "把可以求助的對象先列出來，需要時就不會慌。"
+    ];
+    return tips[dimIndex];
+  }
+  const tips = [
+    "可從小問題開始練習，慢慢建立「我能解決」的感覺。",
+    "遇到事情不要躲開，先拆解成小步驟，一步一步做。",
+    "多記錄自己完成過的事，會幫助你看見自己的力量。",
+    "情緒卡住時找信任的人說一說，不要一個人承擔。",
+    "記住求助不是丟臉，主動開口就是解決問題的開始。"
+  ];
+  return tips[dimIndex];
+}
+
+// 計分
+function calcScore(ansArr){
+  const res = [];
+  let total = 0;
+  dims.forEach((dim,di)=>{
+    let s=0;
+    dim.idx.forEach(i=>{
+      let raw = ansArr[i];
+      if(scaleQuestions[i].r) raw = 6 - raw;
+      s += raw;
+    })
+    total += s;
+    const lv = getLevel(s);
+    res.push({name:dim.name, score:s, level:lv.label, levelCls:lv.cls, tip:getTip(di,s)});
+  })
+  return {dimList:res, total:total};
+}
+
+let currentPage = 0;
+let scaleIndex = 0;
+let draft = JSON.parse(localStorage.getItem("surveyDraft")) || null;
+let allSurveyData = [];
+
+// 初始化班級下拉
+function initClassSelect(){
+  const selSurvey = document.getElementById("class");
+  const selFilter = document.getElementById("filterClass");
+  selSurvey.innerHTML = `<option value="">請選擇班級</option>`;
+  selFilter.innerHTML = `<option value="">全部班級</option>`;
+  CLASS_LIST.forEach(c=>{
+    selSurvey.innerHTML += `<option value="${c}">${c}</option>`;
+    selFilter.innerHTML += `<option value="${c}">${c}</option>`;
+  })
+}
+
+// ===== 單題渲染 =====
+function renderSingleQuestion(){
+  const item = scaleQuestions[scaleIndex];
+  document.getElementById("q-counter").textContent = `第 ${scaleIndex+1}/30 題`;
+  document.getElementById("q-text").textContent = item.q;
+  document.getElementById("q-progress").style.width = ((scaleIndex+1)/30*100) + "%";
+  const box = document.getElementById("q-options");
+  box.innerHTML = "";
+  for(let v=1;v<=5;v++){
+    const btn = document.createElement("button");
+    btn.className = "opt-btn" + (draft.scaleAns[scaleIndex]===v ? " selected" : "");
+    btn.innerHTML = `<span class="opt-num">${v}</span>${OPT_LABELS[v-1]}`;
+    btn.onclick = ()=>selectScale(v);
+    box.appendChild(btn);
+  }
+  document.getElementById("q-next").textContent = scaleIndex===29 ? "完成量表" : "下一題";
+}
+
+function selectScale(v){
+  draft.scaleAns[scaleIndex] = v;
+  saveDraft();
+  renderSingleQuestion();
+}
+
+function nextScale(){
+  if(draft.scaleAns[scaleIndex]===null || draft.scaleAns[scaleIndex]===undefined){
+    alert("請先選擇一個答案再繼續");
+    return;
+  }
+  if(scaleIndex<29){
+    scaleIndex++;
+    renderSingleQuestion();
+  }else{
+    goPage(3);
+  }
+}
+
+function prevScale(){
+  if(scaleIndex>0){
+    scaleIndex--;
+    renderSingleQuestion();
+  }else{
+    goPage(1);
+  }
+}
+
+// 切頁
+function goPage(n){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(`page${n}`).classList.add("active");
+  currentPage = n;
+  if(n===1) initClassSelect();
+  if(n===2) renderSingleQuestion();
+  saveDraft();
+}
+
+function startSurvey(){
+  if(draft){
+    if(confirm("偵測到未完成的填寫紀錄，是否接續上次填寫？取消則重新開始")){
+      fillDraft();
+      scaleIndex = 0;
+      goPage(1);
+      return;
+    }else{
+      localStorage.removeItem("surveyDraft");
+      draft=null;
+    }
+  }
+  draft = {name:"",cls:"",seat:"",gender:"",scaleAns:new Array(30).fill(null),open1:"",open2:"",open3:""};
+  scaleIndex = 0;
+  goPage(1);
+}
+
+function fillDraft(){
+  document.getElementById("name").value = draft.name||"";
+  document.getElementById("class").value = draft.cls||"";
+  document.getElementById("seat").value = draft.seat||"";
+  if(draft.gender) document.querySelector(`input[name="gender"][value="${draft.gender}"]`).checked=true;
+  document.getElementById("open1").value = draft.open1||"";
+  document.getElementById("open2").value = draft.open2||"";
+  document.getElementById("open3").value = draft.open3||"";
+  if(!draft.scaleAns || draft.scaleAns.length!==30) draft.scaleAns = new Array(30).fill(null);
+}
+
+function saveDraft(){
+  if(!draft) return;
+  draft.name = document.getElementById("name").value;
+  draft.cls = document.getElementById("class").value;
+  draft.seat = document.getElementById("seat").value;
+  const g = document.querySelector('input[name="gender"]:checked');
+  draft.gender = g ? g.value : "";
+  if(!draft.scaleAns || draft.scaleAns.length!==30) draft.scaleAns = new Array(30).fill(null);
+  draft.open1 = document.getElementById("open1").value;
+  draft.open2 = document.getElementById("open2").value;
+  draft.open3 = document.getElementById("open3").value;
+  localStorage.setItem("surveyDraft",JSON.stringify(draft));
+}
+
+function nextPage(){
+  saveDraft();
+  if(currentPage===1){
+    if(!draft.name || !draft.cls || !draft.seat || !draft.gender){alert("請填寫完整基本資料");return;}
+    scaleIndex = 0;
+    goPage(2);
+    return;
+  }
+  if(currentPage===3){
+    if(!draft.open1.trim()){alert("請填寫此題");return;}
+    goPage(4);
+    return;
+  }
+  if(currentPage===4){
+    if(!draft.open2.trim()){alert("請填寫此題");return;}
+    goPage(5);
+    return;
+  }
+}
+
+async function submitAll(){
+  saveDraft();
+  const scoreResult = calcScore(draft.scaleAns);
+
+  let html = `<div class="total-hero">
+    <p class="total-label">你的總分</p>
+    <p class="total-num">${scoreResult.total}<span class="total-max"> /150</span></p>
+  </div>
+  <p class="result-section-title">各維度表現</p>`;
+  scoreResult.dimList.forEach(d=>{
+    html += `<div class="dim-card">
+      <div class="dim-head">
+        <span class="dim-name">${d.name}</span>
+        <span class="dim-score">${d.score}<small> /30</small></span>
+      </div>
+      <span class="badge ${d.levelCls}">${d.level}</span>
+      <p class="dim-tip">${d.tip}</p>
+    </div>`;
+  })
+  html += `<p class="footnote">本問卷僅作為自我探索與輔導評估輔助工具，非臨床診斷依據。若有明顯的適應困難或情緒困擾，請尋求學校輔導老師或專業心理人員協助。</p>`;
+  document.getElementById("result-box").innerHTML = html;
+
+  // 上傳 Firebase
+  const submitData = {
+    time: new Date().toLocaleString(),
+    ts: new Date(),
+    name:draft.name,
+    cls:draft.cls,
+    seat:draft.seat,
+    gender:draft.gender,
+    scaleAns:draft.scaleAns,
+    open1:draft.open1,
+    open2:draft.open2,
+    open3:draft.open3,
+    dimList:scoreResult.dimList,
+    total:scoreResult.total
+  }
+  try{
+    await db.collection("survey").add(submitData);
+    alert("提交成功！資料已上傳雲端");
+  }catch(err){
+    console.error(err);
+    alert("上傳失敗，請檢查網路或Firebase規則設定");
+  }
+  goPage(6);
+}
+
+function clearDraftAndRestart(){
+  localStorage.removeItem("surveyDraft");
+  draft=null;
+  goPage(0);
+}
+
+// 後台登入
+async function adminLogin(){
+  const p = document.getElementById("admin-pwd").value.trim();
+  if(p === ADMIN_PWD){
+    const snap = await db.collection("survey").orderBy("ts","desc").get();
+    allSurveyData = [];
+    snap.forEach(doc=>{
+      allSurveyData.push({docId: doc.id, ...doc.data()});
+    })
+    initClassSelect();
+    renderAdmin();
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById("admin-page").classList.add("active");
+  }else alert("密碼錯誤");
+}
+
+function renderAdmin(){
+  const filterVal = document.getElementById("filterClass").value;
+  const list = filterVal ? allSurveyData.filter(r=>r.cls === filterVal) : allSurveyData;
+  let html = "";
+  list.forEach((row,idx)=>{
+    html += `<div class="card">
+    <p><strong>【${idx+1}】${row.name}｜${row.cls}｜座號${row.seat}｜${row.time}</strong></p>
+    <p>總分：${row.total}</p>`;
+    if(row.dimList){
+      row.dimList.forEach(d=>{
+        html += `<div class="dim-item"><strong>${d.name} ${d.score}分（${d.level}）</strong></div>`;
+      })
+    }
+    html += `<p>開放題1：${row.open1}</p>
+    <p>開放題2：${row.open2}</p>
+    <p>開放題3：${row.open3}</p>
+    <button class="btn btn-delete" onclick="deleteRecord('${row.docId}')">刪除這筆回覆</button>
+    </div>`
+  })
+  document.getElementById("admin-list").innerHTML = html || "<p>尚無回覆</p>";
+}
+
+function exportCSV(){
+  const filterVal = document.getElementById("filterClass").value;
+  const list = filterVal ? allSurveyData.filter(r=>r.cls === filterVal) : allSurveyData;
+
+  let csv = "\uFEFF時間,姓名,班級,座號,性別,總分,";
+  dims.forEach(d=>csv += `${d.name}-分數,${d.name}-級別,${d.name}-建議,`);
+  csv += "開放題1,開放題2,開放題3\n";
+
+  list.forEach(r=>{
+    let line = `"${r.time}","${r.name}","${r.cls}","${r.seat}","${r.gender}","${r.total}",`;
+    dims.forEach((d,i)=>{
+      const info = r.dimList ? r.dimList[i] : null;
+      if(info){
+        const tip = (info.tip ?? "").replace(/"/g,'""');
+        line += `"${info.score ?? ""}","${info.level ?? ""}","${tip}",`;
+      }else{
+        line += `"","","",`;
+      }
+    })
+    line += `"${r.open1}","${r.open2}","${r.open3}"\n`;
+    csv += line;
+  })
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url;
+  const suffix = filterVal ? `_${filterVal}` : "_全部";
+  a.download="問卷資料"+suffix+"_含分數.csv";
+  a.click();
+}
+
+async function deleteRecord(docId){
+  if(!confirm("確定要刪除這筆回覆嗎？刪除後無法復原。")) return;
+  try{
+    await db.collection("survey").doc(docId).delete();
+    allSurveyData = allSurveyData.filter(r=>r.docId !== docId);
+    renderAdmin();
+    alert("該筆回覆已刪除");
+  }catch(err){
+    console.error(err);
+    alert("刪除失敗，請檢查網路或安全規則設定");
+  }
+}
+
+// 路由
+window.onhashchange = ()=>{
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  if(location.hash === "#admin"){
+    document.getElementById("admin-login").classList.add("active");
+  }else{
+    document.getElementById("page0").classList.add("active");
+  }
+}
+window.onload = ()=>{
+  if(location.hash === "#admin"){
+    document.getElementById("admin-login").classList.add("active");
+  }
+}
+</script>
+</body>
+</html>
